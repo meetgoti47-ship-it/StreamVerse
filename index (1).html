@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVerse - Video Streaming</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React Libraries -->
+    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+    <!-- Babel for JSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Firebase compatibility libraries (v8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+    <style>
+        /* Simple body style to match the dark theme */
+        body {
+            background-color: #111827; /* bg-gray-900 */
+            color: white;
+            font-family: sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // --- Destructure functions from global libraries ---
+        const { useState, useEffect, useRef } = React;
+
+        // --- User's Firebase Configuration ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyBKokoVhxRf37agssBBvaMLfGdkusNNSsU",
+          authDomain: "streamverse-b8e76.firebaseapp.com",
+          projectId: "streamverse-b8e76",
+          storageBucket: "streamverse-b8e76.appspot.com",
+          messagingSenderId: "468705709242",
+          appId: "1:468705709242:web:f46a0e53e5a4e90d4a8683"
+        };
+
+        // --- User's Cloudinary Configuration ---
+        const CLOUDINARY_CLOUD_NAME = "dsnkjcrz5";
+        // FIX: Updated the upload preset name as requested by the user
+        const CLOUDINARY_UPLOAD_PRESET = "StreamVerse";
+        const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/video/upload`;
+
+        // --- Initialize Firebase ---
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // --- Helper Components ---
+        const Spinner = () => (
+          <div className="flex justify-center items-center h-full">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        );
+
+        const Modal = ({ children, onClose }) => (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+            <div className="bg-gray-800 rounded-lg shadow-2xl p-8 w-full max-w-md m-4 relative">
+              {onClose && (
+                <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-white transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+              {children}
+            </div>
+          </div>
+        );
+        
+        // --- Authentication Component ---
+        function AuthScreen() {
+            const [isLogin, setIsLogin] = useState(true);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+                try {
+                    if (isLogin) {
+                        await auth.signInWithEmailAndPassword(email, password);
+                    } else {
+                        await auth.createUserWithEmailAndPassword(email, password);
+                    }
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-gray-900">
+                    <div className="max-w-md w-full bg-gray-800 p-8 rounded-lg shadow-lg">
+                        <h2 className="text-3xl font-bold text-center text-white mb-6">{isLogin ? 'Sign In' : 'Sign Up'}</h2>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <input
+                                type="email"
+                                placeholder="Email Address"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full bg-gray-700 text-white p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                required
+                            />
+                            <input
+                                type="password"
+                                placeholder="Password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full bg-gray-700 text-white p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                required
+                            />
+                            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-500"
+                            >
+                                {loading ? <Spinner /> : (isLogin ? 'Sign In' : 'Sign Up')}
+                            </button>
+                        </form>
+                        <p className="text-center text-gray-400 mt-6">
+                            {isLogin ? "Don't have an account?" : "Already have an account?"}
+                            <button onClick={() => setIsLogin(!isLogin)} className="text-blue-500 hover:underline ml-2">
+                                {isLogin ? 'Sign Up' : 'Sign In'}
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+
+
+        // --- Main App Components ---
+        function RoleSelector({ onSelectRole }) {
+          return (
+            <Modal>
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-white mb-6">Choose Your Role</h2>
+                <div className="space-y-4">
+                  <button onClick={() => onSelectRole('viewer')} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Continue as a Viewer</button>
+                  <button onClick={() => onSelectRole('creator')} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-transform transform hover:scale-105">Continue as a Creator</button>
+                </div>
+              </div>
+            </Modal>
+          );
+        }
+
+        function VideoUploader({ user }) {
+          const [file, setFile] = useState(null);
+          const [title, setTitle] = useState('');
+          const [uploading, setUploading] = useState(false);
+          const [error, setError] = useState('');
+          const fileInputRef = useRef(null);
+
+          const handleFileChange = (e) => {
+            const selectedFile = e.target.files[0];
+            if (selectedFile && selectedFile.type.startsWith('video/')) {
+              setFile(selectedFile);
+              setError('');
+            } else {
+              setFile(null);
+              setError('Please select a valid video file.');
+            }
+          };
+
+          const handleUpload = async () => {
+            if (!file || !title.trim() || !user) {
+              setError('Please select a video file and provide a title.');
+              return;
+            }
+            if (CLOUDINARY_UPLOAD_PRESET === "your_unsigned_preset_name") {
+                setError("Please update the CLOUDINARY_UPLOAD_PRESET variable in the code with your actual preset name from Cloudinary.");
+                return;
+            }
+            setUploading(true);
+            setError('');
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+            try {
+                const response = await fetch(CLOUDINARY_UPLOAD_URL, { method: 'POST', body: formData });
+                if (!response.ok) throw new Error('Cloudinary upload failed.');
+                const data = await response.json();
+                const videoUrl = data.secure_url;
+                const videoId = `vid_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+                const videoDocRef = db.collection('videos').doc(videoId);
+                await videoDocRef.set({ id: videoId, title, url: videoUrl, creatorId: user.uid, fileName: file.name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                setFile(null);
+                setTitle('');
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            } catch (err) {
+                console.error("Upload or Firestore Error:", err);
+                setError('Failed to upload video. Please try again.');
+            } finally {
+                setUploading(false);
+            }
+          };
+
+          return (
+            <div className="bg-gray-800 p-6 rounded-lg shadow-lg mb-8">
+              <h2 className="text-xl font-bold text-white mb-4">Upload a New Video</h2>
+              <div className="space-y-4">
+                <input type="text" placeholder="Video Title" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-gray-700 text-white p-3 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500" disabled={uploading} />
+                <input type="file" accept="video/*" onChange={handleFileChange} ref={fileInputRef} className="w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700" disabled={uploading} />
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+                <button onClick={handleUpload} disabled={uploading || !file || !title.trim()} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">{uploading ? 'Uploading...' : 'Upload Video'}</button>
+              </div>
+            </div>
+          );
+        }
+
+        function VideoPlayer({ video, user, isCreator }) {
+          const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+          const handleDelete = async () => {
+              if (!user || user.uid !== video.creatorId) return;
+              try {
+                  await db.collection('videos').doc(video.id).delete();
+              } catch (error) {
+                  console.error("Error deleting from firestore:", error);
+              }
+              setShowConfirmDelete(false);
+          };
+          return (
+            <div className="bg-gray-800 rounded-lg overflow-hidden shadow-lg group">
+              <div className="relative">
+                <video controls className="w-full h-auto aspect-video" src={video.url} poster={`https://placehold.co/600x400/000000/FFFFFF?text=${encodeURIComponent(video.title)}`}>Your browser does not support the video tag.</video>
+              </div>
+              <div className="p-4 flex justify-between items-center">
+                <h3 className="text-white font-semibold truncate" title={video.title}>{video.title}</h3>
+                {isCreator && user && user.uid === video.creatorId && (
+                  <div className="relative">
+                    <button onClick={() => setShowConfirmDelete(true)} className="text-red-500 hover:text-red-400 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                    {showConfirmDelete && (
+                        <div className="absolute right-0 bottom-full mb-2 w-48 bg-gray-900 p-3 rounded-lg shadow-xl z-10">
+                            <p className="text-white text-sm mb-2">Are you sure?</p>
+                            <div className="flex justify-end space-x-2">
+                                <button onClick={() => setShowConfirmDelete(false)} className="text-xs bg-gray-600 text-white px-2 py-1 rounded">Cancel</button>
+                                <button onClick={handleDelete} className="text-xs bg-red-600 text-white px-2 py-1 rounded">Delete</button>
+                            </div>
+                        </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        function Dashboard({ user, role }) {
+          const [videos, setVideos] = useState([]);
+          const [loading, setLoading] = useState(true);
+          useEffect(() => {
+            const videosCollection = db.collection('videos');
+            const unsubscribe = videosCollection.onSnapshot((snapshot) => {
+              const videosData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+              videosData.sort((a, b) => {
+                const dateA = a.createdAt ? a.createdAt.toDate().getTime() : 0;
+                const dateB = b.createdAt ? b.createdAt.toDate().getTime() : 0;
+                return dateB - dateA;
+              });
+              setVideos(videosData);
+              setLoading(false);
+            }, (error) => {
+                console.error("Error fetching videos:", error);
+                setLoading(false);
+            });
+            return () => unsubscribe();
+          }, []);
+          const creatorVideos = videos.filter(v => v.creatorId === user?.uid);
+          return (
+            <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {role === 'creator' && user && <VideoUploader user={user} />}
+              <h2 className="text-2xl font-bold text-white mb-6">{role === 'creator' ? 'Your Uploaded Videos' : 'Welcome to StreamVerse'}</h2>
+              {loading ? <Spinner /> : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {(role === 'creator' ? creatorVideos : videos).map(video => <VideoPlayer key={video.id} video={video} user={user} isCreator={role === 'creator'} />)}
+                </div>
+              )}
+              {(role === 'creator' ? creatorVideos.length === 0 : videos.length === 0) && !loading && (
+                  <div className="text-center py-16 bg-gray-800 rounded-lg">
+                      <h3 className="text-xl text-white">No videos found.</h3>
+                      {role === 'creator' && <p className="text-gray-400 mt-2">Upload your first video to get started!</p>}
+                  </div>
+              )}
+            </div>
+          );
+        }
+
+        function App() {
+          const [user, setUser] = useState(null);
+          const [role, setRole] = useState(null);
+          const [authLoading, setAuthLoading] = useState(true);
+          
+          useEffect(() => {
+            const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+              setUser(currentUser);
+              setAuthLoading(false);
+            });
+            return () => unsubscribe();
+          }, []);
+
+          const handleSignOut = () => {
+              auth.signOut();
+              setRole(null); // Reset role on sign out
+          };
+
+          if (authLoading) {
+            return <div className="bg-gray-900 min-h-screen flex items-center justify-center"><Spinner /></div>;
+          }
+
+          return (
+            <div className="bg-gray-900 min-h-screen font-sans">
+              <header className="bg-gray-800 shadow-md">
+                <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                  <div className="flex items-center justify-between h-16">
+                    <div className="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-500" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z" /><path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.022 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" /></svg>
+                      <span className="text-white text-2xl font-bold ml-2">StreamVerse</span>
+                    </div>
+                    <div className="flex items-center">
+                        {user && role && <span className="text-gray-300 mr-4 capitalize">Role: {role}</span>}
+                        {user && <button onClick={handleSignOut} className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700">Sign Out</button>}
+                    </div>
+                  </div>
+                </nav>
+              </header>
+              <main>
+                {!user ? (
+                    <AuthScreen />
+                ) : !role ? (
+                    <RoleSelector onSelectRole={setRole} />
+                ) : (
+                    <Dashboard user={user} role={role} />
+                )}
+              </main>
+            </div>
+          );
+        }
+
+        // --- Render the App to the DOM ---
+        const container = document.getElementById('root');
+        ReactDOM.render(<App />, container);
+    </script>
+</body>
+</html>
